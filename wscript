@@ -42,7 +42,7 @@ def configure(conf):
 	#conf.env.append_value('CXXFLAGS', ['-DDEBUG', '-g', '-O0'])
 	#conf.env.append_value('CXXFLAGS', ['-Wall', '-Wextra'])
 	conf.env.append_value('CFLAGS', ['-Os', '-ffunction-sections', '-fdata-sections', '-fPIC'])
-	conf.env.append_value('CXXFLAGS', ['-Os', '-ffunction-sections', '-fdata-sections'])
+	conf.env.append_value('CXXFLAGS', ['-Os', '-ffunction-sections', '-fdata-sections', '-fPIC'])
 	
 	if sys.platform.startswith("darwin"):
 		conf.env.append_value('LINKFLAGS', ['-Wl,-dead_strip'])
@@ -69,10 +69,11 @@ def build(bld):
 	eegdriver = bld.new_task_gen("cxx", "shlib", "node_addon", install_path=None)
 	eegdriver.name = "eegdriver"
 	eegdriver.target = "eegdriver"
-	eegdriver.source = ["src/eegdriver.cc"]
+	eegdriver.source = ["src/eegdriver.cc"] #"src/nsser.c", "src/nsutil.c", "src/openedf.c", "src/nsnet.c", "src/monitor.c",
+	#["src/monitor.h", "src/config.h", "src/edfmacros.h", "src/nsnet.h", "src/nsser.h", "src/nsutil.h", "src/openedf.h"]
 	eegdriver.includes = ['/opt/local/include']
-	eegdriver.cflags = ['-Wall']
-	eegdriver.cxxflags = ['-Wall']
+	eegdriver.cflags = ['-Wall', '-I../src']
+	eegdriver.cxxflags = ['-Wall', '-I../src']
 
 def shutdown(ctx):
 	print "done"

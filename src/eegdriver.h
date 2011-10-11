@@ -5,6 +5,18 @@
 #include <node_object_wrap.h>
 #include <v8.h>
 
+extern "C" {
+	#include <stdio.h>
+	#include <assert.h>
+	#include <stdlib.h>
+	#include <string.h>
+	#include <nsnet.h>
+	#include <nsutil.h>
+	#include <nsser.h>
+	#include <openedf.h>
+	#include <config.h>
+}
+
 using namespace v8;
 using namespace node;
 
@@ -15,7 +27,7 @@ class EEGDriver : public EventEmitter
     ~EEGDriver() {}
     
     static void Initialize(Handle<Object> target);
-	static Handle<Value> gobble(const Arguments &args);
+		static Handle<Value> gobble(const Arguments &args);
 	
   private:
     static Handle<Value> New(const Arguments &args);
