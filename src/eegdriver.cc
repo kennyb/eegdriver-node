@@ -27,7 +27,7 @@ using namespace node;
 //static std::string xml_special_chars(std::string str);
 
 // static vars
-static EEGDriver *eegdriver;
+//static EEGDriver *eegdriver;
 
 // events
 //static Persistent<String> symbol_stateChange = NODE_PSYMBOL("stateChanged");
@@ -68,6 +68,8 @@ Handle<Value> EEGDriver::New(const Arguments &args)
 }
 
 Handle<Value> EEGDriver::gobble(const Arguments &args) {
+	EEGDriver *eegdriver = ObjectWrap::Unwrap<EEGDriver>(args.This());
+	
 	int c;
 	switch(args.Length()) {
 		case 1:
@@ -79,50 +81,24 @@ Handle<Value> EEGDriver::gobble(const Arguments &args) {
 			break;
 	}
 	
+	if(c > 255) {
+		return VException("unfortunately, I don't accept utf8 chars, please pass a buffer[i]");
+	}
+	
 	//TODO: call the local function in the class
 	//TODO: create the class with the static variables used there
 	//TODO: implement the routine to gobble the bytes
 	//TODO: when it wants to print, emit an event (I do have to research how to do this again...)
+	eegdriver->gobble((unsigned char)c);
 	
 	return True();
 }
 
 
+
+
 extern "C" {
-
-#include <stdio.h>
-#include <assert.h>
-#include <stdlib.h>
-#include <string.h>
-#include <nsnet.h>
-#include <nsutil.h>
-#include <nsser.h>
-#include <openedf.h>
-#include <config.h>
-
 /* This is the maximum size of a protocol packet */
-#define PROTOWINDOW 24
-
-#define MAXPACKETSIZE 17
-
-char buf[PROTOWINDOW];
-sock_t sock_fd;
-int bufCount;
-static int failCount = 0;
-static struct OutputBuffer ob;
-static struct InputBuffer ib;
-
-int hasMatchedProtocol;
-int isP2, isP3;
-int isValidPacket(unsigned short nchan, unsigned short *samples);
-int doesMatchP3(unsigned char c, unsigned short *vals,int *nsamples);
-int doesMatchP2(unsigned char c, unsigned short *vals,int *nsamples);
-int mGetOK(sock_t fd, struct InputBuffer *ib);
-
-int mGetOK(sock_t fd, struct InputBuffer *ib)
-{
-	return 0;
-}
 
 static struct EDFDecodedConfig modEEGCfg = {
 		{ 0,   // header bytes, to be set later
@@ -153,7 +129,7 @@ static struct EDFDecodedConfig modEEGCfg = {
 		}
 	};
 
-static struct EDFDecodedConfig current;
+//static struct EDFDecodedConfig current;
 
 int isValidPacket(unsigned short chan, unsigned short *samples)
 {
@@ -165,12 +141,12 @@ int isValidPacket(unsigned short chan, unsigned short *samples)
 	return 1;
 }
 
-void resetBuffer(void)
+void EEGDriver::resetBuffer(void)
 {
-	bufCount = 0;
+	this->bufCount = 0;
 }
 
-void gobbleChars(int howMany)
+void EEGDriver::gobbleChars(int howMany)
 {
 	assert(howMany <= bufCount);
 	if (bufCount > howMany)
@@ -178,18 +154,19 @@ void gobbleChars(int howMany)
 	bufCount -= howMany;
 }
 
-void gobble(unsigned char c)
+}
+
+void EEGDriver::gobble(unsigned char c)
 {
 #define MINGOOD 6
 	int oldHasMatched;
-	static int goodCount;
 	unsigned short vals[MAXCHANNELS];
 	int ns;
 	int didMatch = 0;
 	oldHasMatched = hasMatchedProtocol;
 	if (bufCount == PROTOWINDOW - 1)
 		memmove(buf, buf+1, PROTOWINDOW - 1);
-	buf[bufCount] = c;
+	this->buf[this->bufCount] = c;
 	if (bufCount < PROTOWINDOW - 1)
 		bufCount += 1;
 	if (hasMatchedProtocol) {
@@ -218,7 +195,7 @@ void gobble(unsigned char c)
 			goodCount += 1;
 		}
 		else {
-			rprintf("Warning: invalid serial packet ahead!\n");
+			printf("Warning: invalid serial packet ahead!\n");
 		}
 		if (isP2)
 			pstr = "P2";
@@ -235,29 +212,29 @@ void gobble(unsigned char c)
 	else {
 		failCount += 1;
 		if (failCount % PROTOWINDOW == 0) {
-			rprintf("Serial packet sync error -- missed window.\n");
+			printf("Serial packet sync error -- missed window.\n");
 			goodCount = 0;
 		}
 	}
 }
 
-void handleSamples(int packetCounter, int chan, unsigned short *vals)
+void EEGDriver::handleSamples(int packetCounter, int chan, unsigned short *vals)
 {
 	char buf[MAXLEN];
 	int bufPos = 0;
 	int i;
 //	printf("Got good packet with counter %d, %d chan\n", packetCounter, chan);
-	if (chan > current.hdr.dataRecordChannels)
-		chan = current.hdr.dataRecordChannels;
+	//TODO:if (chan > current.hdr.dataRecordChannels)
+	//TODO:	chan = current.hdr.dataRecordChannels;
 	bufPos += sprintf(buf+bufPos, "! %d %d", packetCounter, chan);
 	for (i = 0; i < chan; ++i)
 		bufPos += sprintf(buf+bufPos, " %d", vals[i]);
 	bufPos += sprintf(buf+bufPos, "\r\n");
-	writeString(sock_fd, buf, &ob);
-	mGetOK(sock_fd, &ib);
+	//TODO: writeString(sock_fd, buf, &ob);
+	//TODO: mGetOK(sock_fd, &ib);
 }
 
-int doesMatchP3(unsigned char c,  unsigned short *vals,int *nsamples)
+int EEGDriver::doesMatchP3(unsigned char c,  unsigned short *vals,int *nsamples)
 {
 	static int i = 0;
 	static int j = 0;
@@ -303,12 +280,12 @@ int doesMatchP3(unsigned char c,  unsigned short *vals,int *nsamples)
 			i = 0;
 			j = 0;
 			needsHeader = 1;
-			handleSamples(packetCounter, *nsamples, vals);
+			this->handleSamples(packetCounter, *nsamples, vals);
 			return 1;
 		}
 		else {
 			if (isP3)
-				rprintf("P3 sync error:i=%d,j=%d,c=%d.\n",i,j,c);
+				printf("P3 sync error:i=%d,j=%d,c=%d.\n",i,j,c);
 		}
 		goto resetMachine;
 	}
@@ -321,7 +298,7 @@ int doesMatchP3(unsigned char c,  unsigned short *vals,int *nsamples)
 	return 0;
 }
 
-int doesMatchP2(unsigned char c, unsigned short *vals,int *nsamples)
+int EEGDriver::doesMatchP2(unsigned char c, unsigned short *vals,int *nsamples)
 {
 #define P2CHAN 6
 	enum P2State { waitingA5, waiting5A, waitingVersion, waitingCounter,
@@ -340,7 +317,7 @@ int doesMatchP2(unsigned char c, unsigned short *vals,int *nsamples)
 			else {
 				failCount += 1;
 				if (failCount % PROTOWINDOW == 0) {
-					rprintf("Sync error, packet lost.\n");
+					printf("Sync error, packet lost.\n");
 				}
 			}
 			break;
@@ -385,8 +362,8 @@ int doesMatchP2(unsigned char c, unsigned short *vals,int *nsamples)
 			return 1;
 
 		default:
-				rprintf("Error: unknown state in P2!\n");
-				rexit(0);
+				printf("Error: unknown state in P2!\n");
+				//TODO: rexit(0);
 		}
 	return 0;
 }
@@ -444,6 +421,7 @@ static Handle<Value> entry_to_json(libtorrent::entry e) {
 }
 */
 
+extern "C" {
 // Exporting function
 void init(Handle<Object> target)
 {

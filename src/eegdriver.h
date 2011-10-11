@@ -23,14 +23,38 @@ using namespace node;
 class EEGDriver : public EventEmitter
 {
   public:    
-    EEGDriver() : EventEmitter() {}
+    EEGDriver() : EventEmitter() {
+    	failCount = 0;
+    	bufCount = 0;
+    	goodCount = 0;
+    }
     ~EEGDriver() {}
     
     static void Initialize(Handle<Object> target);
 		static Handle<Value> gobble(const Arguments &args);
 	
-  private:
+  protected:
     static Handle<Value> New(const Arguments &args);
+    #define PROTOWINDOW 24
+		#define MAXPACKETSIZE 17
+
+		char buf[PROTOWINDOW];
+		sock_t sock_fd;
+		int bufCount;
+		int failCount;
+		int goodCount;
+		//struct OutputBuffer ob;
+		//struct InputBuffer ib;
+
+		int hasMatchedProtocol;
+		int isP2, isP3;
+		void gobble(unsigned char c);
+		void resetBuffer();
+		void gobbleChars(int howMany);
+		void handleSamples(int packetCounter, int chan, unsigned short *vals);
+		int isValidPacket(unsigned short nchan, unsigned short *samples);
+		int doesMatchP3(unsigned char c, unsigned short *vals,int *nsamples);
+		int doesMatchP2(unsigned char c, unsigned short *vals,int *nsamples);
 };
 
 
