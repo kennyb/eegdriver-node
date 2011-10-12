@@ -1,5 +1,5 @@
-#ifndef PLAYBOX_H_
-#define PLAYBOX_H_
+#ifndef EEGDRIVER_H_
+#define EEGDRIVER_H_
 
 #include <node.h>
 #include <node_object_wrap.h>
@@ -34,7 +34,6 @@ class EEGDriver : public EventEmitter
 		static Handle<Value> gobble(const Arguments &args);
 	
   protected:
-    static Handle<Value> New(const Arguments &args);
     #define PROTOWINDOW 24
 		#define MAXPACKETSIZE 17
 
@@ -55,7 +54,12 @@ class EEGDriver : public EventEmitter
 		int isValidPacket(unsigned short nchan, unsigned short *samples);
 		int doesMatchP3(unsigned char c, unsigned short *vals,int *nsamples);
 		int doesMatchP2(unsigned char c, unsigned short *vals,int *nsamples);
+		
+	private:
+    static Handle<Value> New(const Arguments &args);
 };
+
+
 
 
 // trim functions ripped from
@@ -100,4 +104,4 @@ std::string& rtrim(std::string &str)
 }
 
 
-#endif  // PLAYBOX_H_
+#endif  // EEGDRIVER_H_

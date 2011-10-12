@@ -1,3 +1,9 @@
 I'm essentially ripping off the code of NeuroServer for now until I do a complete rewrite.
 
 hopefully this becomes useful to someone :)
+
+TODO:
+
+1. static variables are used making it impossible to be anything more than a singleton. make these local properties
+2. figure out the channels and shit2. 
+3. implement the other types of input found in NeuroServer
