@@ -13,7 +13,6 @@ extern "C" {
 	#include <config.h>
 }
 
-#include "nsser.h"
 #include "openedf.h"
 #include "edfmacros.h"
 
