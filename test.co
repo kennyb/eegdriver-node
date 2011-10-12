@@ -1,0 +1,14 @@
+Fs = require 'fs'
+EEGDriver = require './build/default/eegdriver'
+
+driver = new EEGDriver.EEGDriver!
+usb = Fs.createReadStream '/dev/ttyUSB0'
+
+usb.on 'data', (data) ->
+	for x, i of data
+		driver.gobble x
+		
+driver.on 'syncError', ->
+	console.log 'sync error'
+driver.on 'data', (data) ->
+	console.log data
