@@ -5,19 +5,18 @@
 #include <node_object_wrap.h>
 #include <v8.h>
 
-extern "C" {
-	#include <stdio.h>
-	#include <assert.h>
-	#include <stdlib.h>
-	#include <string.h>
-	#include <config.h>
-}
+#include <stdio.h>
+#include <assert.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "openedf.h"
 #include "edfmacros.h"
 
 using namespace v8;
 using namespace node;
+
+#define MAXLEN 16384
 
 class EEGDriver : public EventEmitter
 {
@@ -37,7 +36,6 @@ class EEGDriver : public EventEmitter
 		#define MAXPACKETSIZE 17
 
 		char buf[PROTOWINDOW];
-		sock_t sock_fd;
 		int bufCount;
 		int failCount;
 		int goodCount;

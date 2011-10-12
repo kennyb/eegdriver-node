@@ -3,8 +3,6 @@
 
 #include <stdio.h>
 
-#include <nsnet.h>
-
 #define MAXCHANNELS 32
 #define BYTESPERSAMPLE 2
 #define MAXHEADERLEN ((MAXCHANNELS+1) * 256)
