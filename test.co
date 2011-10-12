@@ -2,7 +2,14 @@ Fs = require 'fs'
 EEGDriver = require './build/default/eegdriver'
 
 driver = new EEGDriver.EEGDriver!
-usb = Fs.createReadStream '/dev/ttyUSB0'
+usb = Fs.createReadStream '/dev/ttyUSB0', {flags: 'w+'}
+
+usb_fd = 0
+
+usb.on 'open', (fd) ->
+	usb_fd = fd
+	
+	console.log "opened usb", fd
 
 usb.on 'data', (data) ->
 	for x, i of data

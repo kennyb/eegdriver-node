@@ -27,67 +27,6 @@ using namespace node;
 static Persistent<String> symbol_syncError = NODE_PSYMBOL("syncError");
 static Persistent<String> symbol_data = NODE_PSYMBOL("data");
 
-
-static Handle<Value> VException(const char *msg) {
-	HandleScope scope;
-	return ThrowException(Exception::Error(String::New(msg)));
-};
-
-
-void EEGDriver::Initialize(v8::Handle<v8::Object> target)
-{
-	// Grab the scope of the call from Node
-	HandleScope scope;
-	// Define a new function template
-	Local<FunctionTemplate> t = FunctionTemplate::New(New);
-	t->Inherit(EventEmitter::constructor_template);
-	t->InstanceTemplate()->SetInternalFieldCount(1);
-	t->SetClassName(String::NewSymbol("EEGDriver"));
-	
-	// gobbles a string or a buffer of bytes
-	NODE_SET_PROTOTYPE_METHOD(t, "gobble", gobble);
-	
-	target->Set(String::NewSymbol("EEGDriver"), t->GetFunction());
-}
-
-// Create a new instance of BSON and assing it the existing context
-Handle<Value> EEGDriver::New(const Arguments &args)
-{
-	HandleScope scope;
-	
-	EEGDriver *eegdriver = new EEGDriver();
-	eegdriver->Wrap(args.This());
-	return args.This();
-}
-
-
-Handle<Value> EEGDriver::gobble(const Arguments &args) {
-	
-	int c;
-	switch(args.Length()) {
-		case 1:
-			c = args[0]->ToInt32()->Value();
-			break;
-			
-		default:
-			return VException("should be one argument only as an int [0-255] or a string (TODO), or a buffer (TODO)");
-			break;
-	}
-	
-	if(c > 255) {
-		return VException("unfortunately, I don't accept utf8 chars, please pass a buffer[i]");
-	}
-	
-	EEGDriver *eegdriver = ObjectWrap::Unwrap<EEGDriver>(args.This());
-	eegdriver->gobble((unsigned char)c);
-	
-	return False();
-}
-
-
-
-
-
 /* This is the maximum size of a protocol packet */
 
 static struct EDFDecodedConfig modEEGCfg = {
@@ -119,7 +58,99 @@ static struct EDFDecodedConfig modEEGCfg = {
 		}
 	};
 
-//static struct EDFDecodedConfig current;
+static struct EDFDecodedConfig current;
+
+const char *getDMY(void)
+{
+	static char buf[81];
+	time_t t;
+	struct tm *it;
+	time(&t);
+	it = localtime(&t);
+	sprintf(buf, "%02d.%02d.%02d", it->tm_mday, it->tm_mon+1, it->tm_year % 100);
+	return buf;
+}
+
+const char *getHMS(void)
+{
+	static char buf[81];
+	time_t t;
+	struct tm *it;
+	time(&t);
+	it = localtime(&t);
+	sprintf(buf, "%02d.%02d.%02d", it->tm_hour, it->tm_min, it->tm_sec);
+	return buf;
+}
+
+
+
+static Handle<Value> VException(const char *msg) {
+	HandleScope scope;
+	return ThrowException(Exception::Error(String::New(msg)));
+};
+
+
+void EEGDriver::Initialize(v8::Handle<v8::Object> target)
+{
+	// Grab the scope of the call from Node
+	HandleScope scope;
+	// Define a new function template
+	Local<FunctionTemplate> t = FunctionTemplate::New(New);
+	t->Inherit(EventEmitter::constructor_template);
+	t->InstanceTemplate()->SetInternalFieldCount(1);
+	t->SetClassName(String::NewSymbol("EEGDriver"));
+	
+	// gobbles a string or a buffer of bytes
+	NODE_SET_PROTOTYPE_METHOD(t, "gobble", gobble);
+	
+	target->Set(String::NewSymbol("EEGDriver"), t->GetFunction());
+}
+
+// Create a new instance of BSON and assing it the existing context
+Handle<Value> EEGDriver::New(const Arguments &args)
+{
+	char EDFPacket[MAXHEADERLEN];
+	int EDFLen = MAXHEADERLEN;
+	
+	HandleScope scope;
+	EEGDriver *eegdriver = new EEGDriver();
+	
+	makeREDFConfig(&current, &modEEGCfg);
+	writeEDFString(&current, EDFPacket, &EDFLen);
+	
+	//TODO: get out the device properties
+	//TODO: this should also, actually have a start/stop function
+	
+	eegdriver->Wrap(args.This());
+	return args.This();
+}
+
+
+Handle<Value> EEGDriver::gobble(const Arguments &args) {
+	
+	int c;
+	switch(args.Length()) {
+		case 1:
+			c = args[0]->ToInt32()->Value();
+			break;
+			
+		default:
+			return VException("should be one argument only as an int [0-255] or a string (TODO), or a buffer (TODO)");
+			break;
+	}
+	
+	if(c > 255) {
+		return VException("unfortunately, I don't accept utf8 chars, please pass a buffer[i]");
+	}
+	
+	EEGDriver *eegdriver = ObjectWrap::Unwrap<EEGDriver>(args.This());
+	eegdriver->gobble((unsigned char)c);
+	
+	return False();
+}
+
+
+
 
 int isValidPacket(unsigned short chan, unsigned short *samples)
 {
@@ -130,6 +161,130 @@ int isValidPacket(unsigned short chan, unsigned short *samples)
 	}
 	return 1;
 }
+
+int writeEDFString(const struct EDFDecodedConfig *cfg, char *buf, int *buflen)
+{
+	int retval;
+	char pktbuf[(MAXCHANNELS+1) * 256];
+	retval = EDFEncodePacket(pktbuf, cfg);
+	if (retval) return retval;
+	if (cfg->hdr.headerRecordBytes <= *buflen) {
+		*buflen = cfg->hdr.headerRecordBytes;
+		memcpy(buf, pktbuf, *buflen);
+		return 0;
+	}
+	else {
+		*buflen = 0;
+		return 1;
+	}
+}
+
+void storeEDFString(char *packet, size_t memsize, const char *str)
+{
+	char fmt[8];
+	char buf[257];
+	sprintf(fmt, "%%- %ds", memsize);
+	sprintf(buf, fmt, str);
+	memcpy(packet, buf, memsize);
+}
+
+// TODO: Make this more correct for combinations of d and memsize
+void storeEDFDouble(char *packet, size_t memsize, double d)
+{
+	char buf[64];
+	sprintf(buf, "%g", d);
+	storeEDFString(packet, memsize, buf);
+}
+
+void storeEDFInt(char *packet, size_t memsize, int i)
+{
+	char buf[64];
+	sprintf(buf, "%d", i);
+	storeEDFString(packet, memsize, buf);
+}
+
+int EDFEncodePacket(char *packet, const struct EDFDecodedConfig *cfg)
+{
+	int whichChannel, totalChannels;
+	STOREHFS(dataFormat, cfg->hdr.dataFormat);
+	STOREHFS(localPatient, cfg->hdr.localPatient);
+	STOREHFS(localRecorder, cfg->hdr.localRecorder);
+	STOREHFS(recordingStartDate, cfg->hdr.recordingStartDate);
+	STOREHFS(recordingStartTime, cfg->hdr.recordingStartTime);
+	STOREHFI(headerRecordBytes, cfg->hdr.headerRecordBytes);
+	STOREHFS(manufacturerID, cfg->hdr.manufacturerID);
+	STOREHFI(dataRecordCount, cfg->hdr.dataRecordCount);
+	STOREHFD(dataRecordSeconds, cfg->hdr.dataRecordSeconds);
+	STOREHFI(dataRecordChannels, cfg->hdr.dataRecordChannels);
+	totalChannels = cfg->hdr.dataRecordChannels;
+	packet += 256;
+	for (whichChannel = 0; whichChannel < totalChannels; whichChannel++) {
+		STORECFS(label, cfg->chan[whichChannel].label);
+		STORECFS(transducer, cfg->chan[whichChannel].transducer);
+		STORECFS(dimUnit, cfg->chan[whichChannel].dimUnit);
+		STORECFD(physMin, cfg->chan[whichChannel].physMin);
+		STORECFD(physMax, cfg->chan[whichChannel].physMax);
+		STORECFD(digiMin, cfg->chan[whichChannel].digiMin);
+		STORECFD(digiMax, cfg->chan[whichChannel].digiMax);
+		STORECFS(prefiltering, cfg->chan[whichChannel].prefiltering);
+		STORECFI(sampleCount, cfg->chan[whichChannel].sampleCount);
+		STORECFS(reserved, cfg->chan[whichChannel].reserved);
+	}
+	return 0;
+}
+
+
+int setEDFHeaderBytes(struct EDFDecodedConfig *cfg)
+{
+	cfg->hdr.headerRecordBytes = 256 * (cfg->hdr.dataRecordChannels + 1);
+	return 0;
+}
+
+int isValidREDF(const struct EDFDecodedConfig *cfg)
+{
+	int i;
+	if (cfg->hdr.dataRecordSeconds != 1.0) {
+		//TODO: setLastError("The data record must be exactly 1 second, not %f.", 
+		//						 cfg->hdr.dataRecordSeconds);
+		return 0;
+	}
+	if (cfg->hdr.dataRecordChannels < 1) {
+		//TODO: setLastError("The data record must have at least one channel.");
+		return 0;
+	}
+	if (cfg->chan[0].sampleCount < 1) {
+		//TODO: setLastError("Channel 0 must have at least one sample.");
+		return 0;
+	}
+	for (i = 1; i < cfg->hdr.dataRecordChannels; ++i) {
+		if (cfg->chan[i].sampleCount != cfg->chan[0].sampleCount) {
+			//TODO: setLastError("Channel %d has %d samples, but channel 0 has %d.  These must be the same.", cfg->chan[i].sampleCount, cfg->chan[0].sampleCount);
+			return 0;
+		}
+	}
+	return 1;
+}
+
+
+int makeREDFConfig(struct EDFDecodedConfig *result, const struct EDFDecodedConfig *source)
+{
+	int newSamples, i;
+	*result = *source;
+	if (source->hdr.dataRecordSeconds != 1.0) {
+		result->hdr.dataRecordSeconds = 1;
+		newSamples = ((double)source->chan[0].sampleCount) / 
+			             source->hdr.dataRecordSeconds;
+		for (i = 0; i < source->hdr.dataRecordChannels; ++i)
+			result->chan[i].sampleCount = newSamples;
+	}
+	setEDFHeaderBytes(result);
+	strcpy(result->hdr.recordingStartDate, getDMY());
+	strcpy(result->hdr.recordingStartTime, getHMS());
+	assert(isValidREDF(result));
+	return 0;
+}
+
+
 
 void EEGDriver::resetBuffer(void)
 {

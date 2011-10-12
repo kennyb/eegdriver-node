@@ -10,12 +10,12 @@ extern "C" {
 	#include <assert.h>
 	#include <stdlib.h>
 	#include <string.h>
-	#include <nsnet.h>
-	#include <nsutil.h>
-	#include <nsser.h>
-	#include <openedf.h>
 	#include <config.h>
 }
+
+#include "nsser.h"
+#include "openedf.h"
+#include "edfmacros.h"
 
 using namespace v8;
 using namespace node;
