@@ -8,14 +8,31 @@ usb_fd = 0
 
 usb.on 'open', (fd) ->
 	usb_fd = fd
-	
-	console.log "opened usb", fd
+	cmd = new Buffer("eeg\n");
+	Fs.write fd, cmd, 0, cmd.length, null, (err, written, buffer) ->
+		throw err if err
+		console.log "mode eeg", written
+		header = driver.header!
+		cmd = new Buffer header.length+1+"setheader ".length
+		cmd.write "setheader "
+		header.copy cmd, "setheader ".length
+		cmd[*-1] = "\n"
+		Fs.write fd, cmd, 0, cmd.length, null, (err, written, buffer) ->
+			throw err if err
+			console.log "set header", written
+		
+	console.log "opened usb", fd, driver.header!
 
 usb.on 'data', (data) ->
+	#console.log "data", data.length
 	for x, i of data
 		driver.gobble x
 		
 driver.on 'syncError', ->
 	console.log 'sync error'
+
+driver.on 'setHeader', (header) ->
+	console.log 'setHeader', header
+
 driver.on 'data', (data) ->
 	console.log data

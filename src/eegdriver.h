@@ -21,15 +21,12 @@ using namespace node;
 class EEGDriver : public EventEmitter
 {
   public:    
-    EEGDriver() : EventEmitter() {
-    	failCount = 0;
-    	bufCount = 0;
-    	goodCount = 0;
-    }
+    EEGDriver();
     ~EEGDriver() {}
     
     static void Initialize(Handle<Object> target);
 		static Handle<Value> gobble(const Arguments &args);
+		static Handle<Value> header(const Arguments &args);
 	
   protected:
     #define PROTOWINDOW 24

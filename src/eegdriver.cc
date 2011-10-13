@@ -25,6 +25,7 @@ using namespace node;
 
 // events
 static Persistent<String> symbol_syncError = NODE_PSYMBOL("syncError");
+static Persistent<String> symbol_setHeader = NODE_PSYMBOL("setHeader");
 static Persistent<String> symbol_data = NODE_PSYMBOL("data");
 
 /* This is the maximum size of a protocol packet */
@@ -90,7 +91,7 @@ static Handle<Value> VException(const char *msg) {
 };
 
 
-void EEGDriver::Initialize(v8::Handle<v8::Object> target)
+void EEGDriver::Initialize(Handle<Object> target)
 {
 	// Grab the scope of the call from Node
 	HandleScope scope;
@@ -102,6 +103,7 @@ void EEGDriver::Initialize(v8::Handle<v8::Object> target)
 	
 	// gobbles a string or a buffer of bytes
 	NODE_SET_PROTOTYPE_METHOD(t, "gobble", gobble);
+	NODE_SET_PROTOTYPE_METHOD(t, "header", header);
 	
 	target->Set(String::NewSymbol("EEGDriver"), t->GetFunction());
 }
@@ -109,14 +111,8 @@ void EEGDriver::Initialize(v8::Handle<v8::Object> target)
 // Create a new instance of BSON and assing it the existing context
 Handle<Value> EEGDriver::New(const Arguments &args)
 {
-	char EDFPacket[MAXHEADERLEN];
-	int EDFLen = MAXHEADERLEN;
-	
 	HandleScope scope;
 	EEGDriver *eegdriver = new EEGDriver();
-	
-	makeREDFConfig(&current, &modEEGCfg);
-	writeEDFString(&current, EDFPacket, &EDFLen);
 	
 	//TODO: get out the device properties
 	//TODO: this should also, actually have a start/stop function
@@ -125,6 +121,42 @@ Handle<Value> EEGDriver::New(const Arguments &args)
 	return args.This();
 }
 
+EEGDriver::EEGDriver() : EventEmitter() {
+	failCount = 0;
+	bufCount = 0;
+	goodCount = 0;
+}
+
+Handle<Value> EEGDriver::header(const Arguments &args) {
+	HandleScope scope;
+	char EDFPacket[MAXHEADERLEN];
+	int EDFLen = MAXHEADERLEN;
+	
+	makeREDFConfig(&current, &modEEGCfg);
+	writeEDFString(&current, EDFPacket, &EDFLen);
+	
+	Local<Value> event[1];
+	Buffer *header = Buffer::New(EDFPacket, EDFLen);
+	Local<Object> globalObj = Context::GetCurrent()->Global();
+ 
+	// Now we need to grab the Buffer constructor function.
+	Local<Function> bufferConstructor = Local<Function>::Cast(globalObj->Get(String::New("Buffer")));
+	 
+	// Great. We can use this constructor function to allocate new Buffers.
+	// Let's do that now. First we need to provide the correct arguments.
+	// First argument is the JS object Handle for the SlowBuffer.
+	// Second arg is the length of the SlowBuffer.
+	// Third arg is the offset in the SlowBuffer we want the .. "Fast"Buffer to start at.
+	Handle<Value> constructorArgs[3] = { header->handle_, Integer::New(EDFLen), Integer::New(0) };
+	
+	// Now we have our constructor, and our constructor args. Let's create the
+	// damn Buffer already!
+	Local<Object> actualBuffer = bufferConstructor->NewInstance(3, constructorArgs);
+
+	//event[0] = actualBuffer;
+	//this->Emit(symbol_setHeader, 1, event);
+	return scope.Close(actualBuffer);
+}
 
 Handle<Value> EEGDriver::gobble(const Arguments &args) {
 	
@@ -152,7 +184,7 @@ Handle<Value> EEGDriver::gobble(const Arguments &args) {
 
 
 
-int isValidPacket(unsigned short chan, unsigned short *samples)
+int EEGDriver::isValidPacket(unsigned short chan, unsigned short *samples)
 {
 	int i;
 	if (chan != 2 && chan != 4 && chan != 6) return 0;
@@ -348,10 +380,10 @@ void EEGDriver::gobble(unsigned char c)
 			
 		failCount = 0;
 	
-//		printf("Got %s packet with %d values: ", pstr, ns);
-//		for (i = 0; i < ns; ++i)
-//			printf("%d ", vals[i]);
-//		printf("\n");
+		printf("Got %s packet with %d values: ", pstr, ns);
+		for (int i = 0; i < ns; ++i)
+			printf("%d ", vals[i]);
+		printf("\n");
 	}
 	else {
 		failCount += 1;
