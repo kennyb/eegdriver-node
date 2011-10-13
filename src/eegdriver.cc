@@ -380,10 +380,11 @@ void EEGDriver::gobble(unsigned char c)
 			
 		failCount = 0;
 	
-		printf("Got %s packet with %d values: ", pstr, ns);
-		for (int i = 0; i < ns; ++i)
-			printf("%d ", vals[i]);
-		printf("\n");
+		//printf("Got %s packet with %d values: ", pstr, ns);
+		//for (int i = 0; i < ns; ++i) {
+		//	printf("%d ", vals[i]);
+		//}
+		//printf("\n");
 	}
 	else {
 		failCount += 1;
@@ -407,12 +408,16 @@ void EEGDriver::handleSamples(int packetCounter, int chan, unsigned short *vals)
 	for (i = 0; i < chan; ++i)
 		bufPos += sprintf(buf+bufPos, " %d", vals[i]);
 	bufPos += sprintf(buf+bufPos, "\r\n");
+	
 	Local<Object> result = Object::New();
 	result->Set(String::New("packet"), Integer::New(packetCounter));
 	Local<Object> channels = Object::New();
 	for (i = 0; i < chan; ++i)
 		channels->Set(Integer::New(i), Integer::New(vals[i]));
 	result->Set(String::New("channels"), channels);
+	Local<Value> event[1];
+	event[0] = result;
+	this->Emit(symbol_data, 1, event);
 	//TODO: writeString(sock_fd, buf, &ob);
 	//TODO: mGetOK(sock_fd, &ib);
 }

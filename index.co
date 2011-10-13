@@ -1,0 +1,41 @@
+Fs = require 'fs'
+Events = require 'events'
+eegdriver = require './build/default/eegdriver'
+
+class exports.EEGDriver extends Events.EventEmitter
+	usb_fd: 0
+	(device) ->
+		driver = @driver = new eegdriver.EEGDriver!
+		usb = Fs.createReadStream device, {flags: 'w+'}
+		usb.on 'open', (fd) ->
+			console.log "opened usb", fd
+			@usb_fd = fd
+			cmd = new Buffer("eeg\n");
+			Fs.write fd, cmd, 0, cmd.length, null, (err, written, buffer) ->
+				throw err if err
+				console.log "mode eeg", written
+				header = driver.header!
+				cmd = new Buffer header.length+1+"setheader ".length
+				cmd.write "setheader "
+				header.copy cmd, "setheader ".length
+				cmd[*-1] = "\n"
+				Fs.write fd, cmd, 0, cmd.length, null, (err, written, buffer) ->
+					throw err if err
+					console.log "set header", written
+
+		usb.on 'data', (data) ->
+			#console.log "data", data.length
+			for x, i of data
+				driver.gobble x
+		
+		driver.on 'syncError', ->
+			console.log 'sync error'
+
+		driver.on 'setHeader', (header) ->
+			console.log 'setHeader', header
+
+		driver.on 'data', (data) ~>
+			@emit "data", data
+			#console.log data
+		
+
