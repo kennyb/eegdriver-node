@@ -1,0 +1,34 @@
+{
+  "name": "eegdriver",
+  "version": "0.6.7",
+  "description": "EEG headset driver",
+  "keywords": [
+    "neurofeedback",
+    "NeuroServer",
+    "EEG"
+  ],
+  "author": "kenneth <kenny@unhosted.org> (http://kennyb.github.com)",
+  "homepage": "http://kennyb.github.com/eegdriver-node/",
+  "licenses": [
+    {
+      "type": "MIT",
+      "url": "https://github.com/kennyb/eegdriver-node/raw/master/LICENSE"
+    }
+  ],
+  "engines": {
+    "node": ">= 0.4.12"
+  },
+  "directories": {
+    "lib": "./lib"
+  },
+  "main": "./index.js",
+  "engine": "node",
+  "scripts": {
+    "install": "node-waf configure build",
+    "update": "node-waf build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/kennyb/eegdriver-node.git"
+  }
+}
